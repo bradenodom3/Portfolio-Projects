@@ -66,7 +66,7 @@ ORDER BY 1,2;
 
 
 
--- 8) Shows a rolling count of vaccinations in each country on each date, as well as a percent of the population that has been vaccinated
+-- 8) Shows a total number of vaccinations given in each country as of the most recent date they have data for, as well as a percent of the population that has been vaccinated
 WITH PopVsVac (continent, location, date, population, new_vaccinations, RollingCountVaccinations)
 AS
 (
@@ -80,7 +80,87 @@ FROM [Portfolio Project]..CovidVaccinations AS v
 WHERE d.continent IS NOT NULL
 --ORDER BY 2,3
 )
-SELECT *, (RollingCountVaccinations/population)*100 AS percent_vaccinated
-FROM PopVsVac;
+SELECT location, MAX(date) AS Most_recent_date, MAX(RollingCountVaccinations) AS Total_Vaccinations, MAX(population) AS Population, MAX(RollingCountVaccinations/population)*100 AS percent_vaccinated
+FROM PopVsVac
+GROUP BY location
+ORDER BY percent_vaccinated DESC;
+
+ 
+
+-- CORRELATION QUERIES
+-- 9) Effect of Aging population on death percentage
+SELECT v.continent, v.location, ROUND(AVG(v.aged_70_older),2) AS 'Percent 70+', (SUM(d.new_deaths)/SUM(d.new_cases))*100 AS DeathPercentage
+FROM [Portfolio Project]..CovidVaccinations AS v
+	JOIN [Portfolio Project]..CovidDeaths AS d
+	ON d.location = v.location
+	AND d.date = v.date
+WHERE d.continent IS NOT NULL
+	AND d.new_cases IS NOT NULL
+	AND d.new_cases NOT LIKE '0' -- Eliminate countries with no new cases
+GROUP BY v.location, v.continent
+ORDER BY [Percent 70+] DESC;
 
 
+-- 10) Effect of people fully vaccinated on death percentage
+SELECT v.continent, v.location, AVG(d.population) AS Population, 
+	ROUND(AVG(CAST(v.people_fully_vaccinated AS float)),0) AS Total_Ppl_Vaxed, 
+	ROUND(AVG(CAST(v.people_fully_vaccinated AS float)),0)/AVG(d.population)*100 AS PercentVaxed,
+	100 - (ROUND(AVG(CAST(v.people_fully_vaccinated AS float)),0)/AVG(d.population)*100) AS PercentUnvaxed,
+	(SUM(d.new_deaths)/SUM(d.new_cases))*100 AS DeathPercentage
+FROM [Portfolio Project]..CovidVaccinations AS v
+	JOIN [Portfolio Project]..CovidDeaths AS d
+	ON d.location = v.location
+	AND d.date = v.date
+WHERE d.continent IS NOT NULL
+	AND d.new_cases IS NOT NULL
+	AND d.new_cases NOT LIKE '0' -- Eliminate countries with no new cases
+GROUP BY v.location, v.continent
+ORDER BY PercentVaxed DESC;
+
+-- 11) Effect of diabetes
+SELECT v.continent, v.location, v.diabetes_prevalence, (SUM(d.new_deaths)/SUM(d.new_cases))*100 AS DeathPercentage
+FROM [Portfolio Project]..CovidVaccinations AS v
+	JOIN [Portfolio Project]..CovidDeaths AS d
+	ON d.location = v.location
+	AND d.date = v.date
+WHERE d.continent IS NOT NULL
+	AND d.new_cases IS NOT NULL
+	AND d.new_cases NOT LIKE '0' -- Eliminate countries with no new cases
+GROUP BY v.location, v.continent, v.diabetes_prevalence
+ORDER BY v.diabetes_prevalence DESC;
+
+-- 12) Effect of smoking
+SELECT v.continent, v.location, (AVG(CAST(v.male_smokers AS float)) + AVG(CAST(v.female_smokers AS float))) AS Smokers, (SUM(d.new_deaths)/SUM(d.new_cases))*100 AS DeathPercentage
+FROM [Portfolio Project]..CovidVaccinations AS v
+	JOIN [Portfolio Project]..CovidDeaths AS d
+	ON d.location = v.location
+	AND d.date = v.date
+WHERE d.continent IS NOT NULL
+	AND d.new_cases IS NOT NULL
+	AND d.new_cases NOT LIKE '0' -- Eliminate countries with no new cases
+GROUP BY v.location, v.continent
+ORDER BY Smokers DESC;
+
+-- 13) Effect of poverty
+SELECT v.continent, v.location, AVG(CAST(extreme_poverty AS float)) AS poverty_rate, (SUM(d.new_deaths)/SUM(d.new_cases))*100 AS DeathPercentage
+FROM [Portfolio Project]..CovidVaccinations AS v
+	JOIN [Portfolio Project]..CovidDeaths AS d
+	ON d.location = v.location
+	AND d.date = v.date
+WHERE d.continent IS NOT NULL
+	AND d.new_cases IS NOT NULL
+	AND d.new_cases NOT LIKE '0' -- Eliminate countries with no new cases
+GROUP BY v.location, v.continent
+ORDER BY poverty_rate DESC;
+
+-- 14) Effect of available hospital beds
+SELECT v.continent, v.location, AVG(hospital_beds_per_thousand) AS Hospital_beds_per_thousand, (SUM(d.new_deaths)/SUM(d.new_cases))*100 AS DeathPercentage
+FROM [Portfolio Project]..CovidVaccinations AS v
+	JOIN [Portfolio Project]..CovidDeaths AS d
+	ON d.location = v.location
+	AND d.date = v.date
+WHERE d.continent IS NOT NULL
+	AND d.new_cases IS NOT NULL
+	AND d.new_cases NOT LIKE '0' -- Eliminate countries with no new cases
+GROUP BY v.location, v.continent
+ORDER BY Hospital_beds_per_thousand DESC;
